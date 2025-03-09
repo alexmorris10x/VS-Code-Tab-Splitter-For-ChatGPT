@@ -1,7 +1,7 @@
 {
   "name": "split-selected-tabs",
   "displayName": "Split Selected Tabs",
-  "description": "Splits selected or highlighted open tabs into a split view.",
+  "description": "Splits selected or saved groups of tabs into a split view.",
   "version": "1.0.0",
   "publisher": "your-name",
   "enabledApiProposals": [
@@ -15,7 +15,10 @@
   ],
   "activationEvents": [
     "onCommand:extension.splitSelectedTabs",
-    "onCommand:extension.splitHighlightedTabs"
+    "onCommand:extension.createSplitTabGroup",
+    "onCommand:extension.openSplitTabGroup",
+    "onCommand:extension.listSplitTabGroups",
+    "onCommand:extension.deleteSplitTabGroup"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -25,8 +28,20 @@
         "title": "Split Selected Tabs"
       },
       {
-        "command": "extension.splitHighlightedTabs",
-        "title": "Split Highlighted Tabs"
+        "command": "extension.createSplitTabGroup",
+        "title": "Create Split Tabs Group"
+      },
+      {
+        "command": "extension.openSplitTabGroup",
+        "title": "Open Split Tabs Group"
+      },
+      {
+        "command": "extension.listSplitTabGroups",
+        "title": "List Split Tab Groups"
+      },
+      {
+        "command": "extension.deleteSplitTabGroup",
+        "title": "Delete Split Tab Group"
       }
     ]
   },
