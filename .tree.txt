@@ -1,0 +1,14 @@
+.
+├── out
+│   ├── extension.js
+│   └── extension.js.map
+├── package-lock.json
+├── package.json
+├── set_github_secrets.sh
+├── split-selected-tabs-1.0.0.vsix
+├── src
+│   ├── extension.js
+│   └── extension.ts
+└── tsconfig.json
+
+3 directories, 9 files

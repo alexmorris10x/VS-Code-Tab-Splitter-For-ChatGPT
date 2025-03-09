@@ -1,0 +1,43 @@
+{
+  "name": "split-selected-tabs",
+  "displayName": "Split Selected Tabs",
+  "description": "Splits selected or highlighted open tabs into a split view.",
+  "version": "1.0.0",
+  "publisher": "your-name",
+  "enabledApiProposals": [
+    "tabGroups"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:extension.splitSelectedTabs",
+    "onCommand:extension.splitHighlightedTabs"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.splitSelectedTabs",
+        "title": "Split Selected Tabs"
+      },
+      {
+        "command": "extension.splitHighlightedTabs",
+        "title": "Split Highlighted Tabs"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^18.15.11",
+    "@types/vscode": "^1.80.0",
+    "typescript": "^5.0.4"
+  }
+}
