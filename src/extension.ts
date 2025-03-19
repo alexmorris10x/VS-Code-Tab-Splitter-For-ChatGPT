@@ -8,6 +8,14 @@ interface SplitTabGroup {
 // Global variable to track the URIs of split tabs opened by the extension.
 let splitTabUris: string[] = [];
 
+/**
+ * Type guard to determine if a tab's input is a text document input.
+ * Since TabInputText is an interface, we check that the input is an object and has a 'uri' property.
+ */
+function isTextTabInput(input: unknown): input is vscode.TabInputText {
+  return typeof input === "object" && input !== null && "uri" in input;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   // Helper: Safely gather only those tabs that have a non-empty string label.
   function getAllLabeledTabs(): vscode.Tab[] {
@@ -66,8 +74,9 @@ export function activate(context: vscode.ExtensionContext) {
         let currentColumn = activeEditor?.viewColumn || vscode.ViewColumn.One;
 
         for (const tab of chosenTabs) {
-          if (tab.input instanceof vscode.TabInputText) {
-            const docUri = tab.input.uri;
+          if (isTextTabInput(tab.input)) {
+            const textTabInput = tab.input;
+            const docUri = textTabInput.uri;
 
             // Skip the active tab so it isn't opened twice.
             if (docUri.toString() === activeTabUri) {
@@ -162,7 +171,7 @@ export function activate(context: vscode.ExtensionContext) {
 
         // Build group data: Only include text-based tab URIs.
         const uris = chosenTabs
-          .filter((tab) => tab.input instanceof vscode.TabInputText)
+          .filter((tab) => isTextTabInput(tab.input))
           .map((tab) => (tab.input as vscode.TabInputText).uri.toString());
 
         // Load existing groups.
@@ -380,45 +389,60 @@ export function activate(context: vscode.ExtensionContext) {
     "extension.closeSplitTabs",
     async () => {
       try {
-        // Close tabs opened by our extension.
+        // Define the main column (usually column 1)
+        const mainColumn = vscode.ViewColumn.One;
+
+        // Iterate through all tab groups except the main group.
         for (const group of vscode.window.tabGroups.all) {
-          for (const tab of group.tabs) {
-            if (tab.input instanceof vscode.TabInputText) {
-              const uriStr = tab.input.uri.toString();
-              if (splitTabUris.includes(uriStr)) {
-                const doc = await vscode.workspace.openTextDocument(
-                  tab.input.uri
-                );
-                await vscode.window.showTextDocument(doc, {
-                  viewColumn: group.viewColumn,
-                });
-                await vscode.commands.executeCommand(
-                  "workbench.action.closeActiveEditor"
-                );
+          if (group.viewColumn !== mainColumn) {
+            for (const tab of group.tabs) {
+              if (isTextTabInput(tab.input)) {
+                const uriStr = tab.input.uri.toString();
+                // Close only tabs that were opened as splits.
+                if (splitTabUris.includes(uriStr)) {
+                  const doc = await vscode.workspace.openTextDocument(
+                    tab.input.uri
+                  );
+                  await vscode.window.showTextDocument(doc, {
+                    viewColumn: group.viewColumn,
+                  });
+                  await vscode.commands.executeCommand(
+                    "workbench.action.closeActiveEditor"
+                  );
+                }
               }
             }
           }
         }
 
-        // Clear the tracked split tabs.
+        // Clear the tracked split tabs URIs after closing them.
         splitTabUris = [];
+
+        // Retrieve the active tab's URI to avoid moving it.
+        const activeUri =
+          vscode.window.activeTextEditor?.document.uri.toString();
 
         // Collect remaining tabs from groups that are not in the primary (first) column.
         const tabsToMove: vscode.Tab[] = [];
         vscode.window.tabGroups.all.forEach((group) => {
-          if (group.viewColumn !== vscode.ViewColumn.One) {
+          if (group.viewColumn !== mainColumn) {
             group.tabs.forEach((tab) => {
-              tabsToMove.push(tab);
+              if (isTextTabInput(tab.input)) {
+                const uriStr = tab.input.uri.toString();
+                if (uriStr !== activeUri) {
+                  tabsToMove.push(tab);
+                }
+              }
             });
           }
         });
 
         // Open each remaining tab in the primary column.
         for (const tab of tabsToMove) {
-          if (tab.input instanceof vscode.TabInputText) {
+          if (isTextTabInput(tab.input)) {
             const doc = await vscode.workspace.openTextDocument(tab.input.uri);
             await vscode.window.showTextDocument(doc, {
-              viewColumn: vscode.ViewColumn.One,
+              viewColumn: mainColumn,
               preview: false,
             });
           }
