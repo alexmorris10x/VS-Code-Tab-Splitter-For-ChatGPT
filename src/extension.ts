@@ -5,16 +5,17 @@ interface SplitTabGroup {
   uris: string[];
 }
 
+// Global variable to track the URIs of split tabs opened by the extension.
+let splitTabUris: string[] = [];
+
 export function activate(context: vscode.ExtensionContext) {
-  // Helper: Safely gather only those tabs that have a non-empty string label
+  // Helper: Safely gather only those tabs that have a non-empty string label.
   function getAllLabeledTabs(): vscode.Tab[] {
     const tabGroups = vscode.window.tabGroups.all || [];
     const allTabs: vscode.Tab[] = [];
-
     for (const group of tabGroups) {
       if (!group.tabs) continue;
       for (const t of group.tabs) {
-        // Ensure t is truthy and has a label we can use
         if (t && typeof t.label === "string" && t.label.trim() !== "") {
           allTabs.push(t);
         }
@@ -34,7 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Show Quick Pick with all tab labels
+        // Show Quick Pick with all tab labels.
         const pickedLabels = await vscode.window.showQuickPick(
           allTabs.map((tab) => tab.label),
           {
@@ -43,13 +44,12 @@ export function activate(context: vscode.ExtensionContext) {
           }
         );
 
-        // If user canceled or picked none, exit
         if (!pickedLabels || pickedLabels.length === 0) {
           vscode.window.showInformationMessage("No tabs selected.");
           return;
         }
 
-        // Filter down to the matching Tab objects
+        // Filter to the matching Tab objects.
         const chosenTabs = allTabs.filter((tab) =>
           pickedLabels.includes(tab.label)
         );
@@ -58,17 +58,16 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Start splitting tabs into new columns
+        // Start splitting tabs into new columns.
         let currentColumn =
           vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
 
         for (const tab of chosenTabs) {
-          // Only handle text-based tabs
           if (tab.input instanceof vscode.TabInputText) {
             const docUri = tab.input.uri;
             const doc = await vscode.workspace.openTextDocument(docUri);
 
-            // Check unsaved changes
+            // Check for unsaved changes.
             if (doc.isDirty) {
               const choice = await vscode.window.showWarningMessage(
                 `The file "${docUri.path}" has unsaved changes. Save before splitting?`,
@@ -78,22 +77,25 @@ export function activate(context: vscode.ExtensionContext) {
               if (choice === "Save") {
                 await doc.save();
               } else if (choice !== "Skip") {
-                continue; // canceled or closed
+                continue;
               }
             }
 
-            // Move to next column
+            // Move to the next column.
             currentColumn++;
             if (currentColumn > vscode.ViewColumn.Nine) {
               currentColumn = vscode.ViewColumn.Nine;
             }
 
-            // Show the doc
+            // Show the document in the new column.
             await vscode.window.showTextDocument(doc, {
               viewColumn: currentColumn,
               preserveFocus: true,
               preview: false,
             });
+
+            // Track the URI of the tab opened by our split command.
+            splitTabUris.push(docUri.toString());
           }
         }
       } catch (error) {
@@ -115,7 +117,7 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Show Quick Pick to select tabs
+        // Show Quick Pick to select tabs.
         const pickedLabels = await vscode.window.showQuickPick(
           allTabs.map((tab) => tab.label),
           {
@@ -129,7 +131,7 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Filter down to the matching Tab objects
+        // Filter to the matching Tab objects.
         const chosenTabs = allTabs.filter((tab) =>
           pickedLabels.includes(tab.label)
         );
@@ -138,7 +140,7 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Prompt for group name
+        // Prompt for a group name.
         const groupName = await vscode.window.showInputBox({
           prompt: "Enter a name for this tab group",
           placeHolder: "e.g. My Favorite Tabs",
@@ -149,23 +151,22 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Build group data
+        // Build group data: Only include text-based tab URIs.
         const uris = chosenTabs
           .filter((tab) => tab.input instanceof vscode.TabInputText)
           .map((tab) => (tab.input as vscode.TabInputText).uri.toString());
 
-        // Load existing groups
+        // Load existing groups.
         const existingGroups: SplitTabGroup[] = context.globalState.get(
           "splitTabGroups",
           []
         );
 
-        // Check if group name already exists
+        // Check for a duplicate group name.
         const duplicate = existingGroups.find(
           (group) => group.name === groupName
         );
         if (duplicate) {
-          // Overwrite? or cancel?
           const choice = await vscode.window.showWarningMessage(
             `A group named "${groupName}" already exists. Overwrite it?`,
             "Yes",
@@ -174,16 +175,13 @@ export function activate(context: vscode.ExtensionContext) {
           if (choice !== "Yes") {
             return;
           }
-          // Overwrite existing group
           duplicate.uris = uris;
         } else {
-          // Add new group
           existingGroups.push({ name: groupName, uris });
         }
 
-        // Save updated groups
+        // Save updated groups.
         await context.globalState.update("splitTabGroups", existingGroups);
-
         vscode.window.showInformationMessage(
           `Tab group "${groupName}" created successfully.`
         );
@@ -210,7 +208,7 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Prompt user to pick a group
+        // Prompt user to pick a group.
         const groupName = await vscode.window.showQuickPick(
           existingGroups.map((g) => g.name),
           {
@@ -223,14 +221,12 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Find the chosen group
         const chosenGroup = existingGroups.find((g) => g.name === groupName);
         if (!chosenGroup) {
           vscode.window.showErrorMessage(`Tab group "${groupName}" not found.`);
           return;
         }
 
-        // Open each tab in its own column
         let currentColumn =
           vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
 
@@ -238,7 +234,6 @@ export function activate(context: vscode.ExtensionContext) {
           const docUri = vscode.Uri.parse(uriString);
           const doc = await vscode.workspace.openTextDocument(docUri);
 
-          // Check unsaved changes
           if (doc.isDirty) {
             const choice = await vscode.window.showWarningMessage(
               `The file "${docUri.path}" has unsaved changes. Save before opening?`,
@@ -248,11 +243,10 @@ export function activate(context: vscode.ExtensionContext) {
             if (choice === "Save") {
               await doc.save();
             } else if (choice !== "Skip") {
-              continue; // canceled or closed
+              continue;
             }
           }
 
-          // Move to next column
           currentColumn++;
           if (currentColumn > vscode.ViewColumn.Nine) {
             currentColumn = vscode.ViewColumn.Nine;
@@ -287,7 +281,6 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Let user select a group just to see details
         const pickedGroupName = await vscode.window.showQuickPick(
           existingGroups.map((g) => g.name),
           {
@@ -300,7 +293,6 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Find chosen group
         const foundGroup = existingGroups.find(
           (g) => g.name === pickedGroupName
         );
@@ -311,7 +303,6 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Show an information message with the list of URIs
         const fileList = foundGroup.uris.join("\n• ");
         vscode.window.showInformationMessage(
           `Files in "${foundGroup.name}":\n• ${fileList}`
@@ -337,7 +328,6 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Prompt user to pick a group to delete
         const groupName = await vscode.window.showQuickPick(
           existingGroups.map((g) => g.name),
           {
@@ -352,7 +342,6 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Confirm deletion
         const confirm = await vscode.window.showWarningMessage(
           `Are you sure you want to delete "${groupName}"? This cannot be undone.`,
           "Yes",
@@ -363,7 +352,6 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Remove group from the array
         const updatedGroups = existingGroups.filter(
           (g) => g.name !== groupName
         );
@@ -378,13 +366,73 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  // Push all commands to context subscriptions
+  // COMMAND 6: Close Split Tabs and consolidate remaining tabs into a single view.
+  const closeSplitTabsCmd = vscode.commands.registerCommand(
+    "extension.closeSplitTabs",
+    async () => {
+      try {
+        // Close tabs opened by our extension.
+        for (const group of vscode.window.tabGroups.all) {
+          for (const tab of group.tabs) {
+            if (tab.input instanceof vscode.TabInputText) {
+              const uriStr = tab.input.uri.toString();
+              if (splitTabUris.includes(uriStr)) {
+                const doc = await vscode.workspace.openTextDocument(
+                  tab.input.uri
+                );
+                await vscode.window.showTextDocument(doc, {
+                  viewColumn: group.viewColumn,
+                });
+                await vscode.commands.executeCommand(
+                  "workbench.action.closeActiveEditor"
+                );
+              }
+            }
+          }
+        }
+
+        // Clear the tracked split tabs.
+        splitTabUris = [];
+
+        // Collect remaining tabs from groups that are not in the primary (first) column.
+        const tabsToMove: vscode.Tab[] = [];
+        vscode.window.tabGroups.all.forEach((group) => {
+          if (group.viewColumn !== vscode.ViewColumn.One) {
+            group.tabs.forEach((tab) => {
+              tabsToMove.push(tab);
+            });
+          }
+        });
+
+        // Open each remaining tab in the primary column.
+        for (const tab of tabsToMove) {
+          if (tab.input instanceof vscode.TabInputText) {
+            const doc = await vscode.workspace.openTextDocument(tab.input.uri);
+            await vscode.window.showTextDocument(doc, {
+              viewColumn: vscode.ViewColumn.One,
+              preview: false,
+            });
+          }
+        }
+
+        // Consolidate the layout so that all remaining tabs are in a single group.
+        await vscode.commands.executeCommand(
+          "workbench.action.editorLayoutSingle"
+        );
+      } catch (error) {
+        vscode.window.showErrorMessage(`Error closing split tabs: ${error}`);
+      }
+    }
+  );
+
+  // Register all commands.
   context.subscriptions.push(
     splitSelectedTabsCmd,
     createSplitTabGroupCmd,
     openSplitTabGroupCmd,
     listSplitTabGroupsCmd,
-    deleteSplitTabGroupCmd
+    deleteSplitTabGroupCmd,
+    closeSplitTabsCmd
   );
 }
 
