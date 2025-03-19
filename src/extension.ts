@@ -47,23 +47,26 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Show Quick Pick with all tab labels.
-        const pickedLabels = await vscode.window.showQuickPick(
-          allTabs.map((tab) => tab.label),
-          {
-            canPickMany: true,
-            placeHolder: "Select tabs to split into separate columns",
-          }
-        );
+        // Create QuickPickItems for all tabs with them pre-selected.
+        const items: vscode.QuickPickItem[] = allTabs.map((tab) => ({
+          label: tab.label,
+          picked: true,
+        }));
 
-        if (!pickedLabels || pickedLabels.length === 0) {
+        // Show Quick Pick with all items pre-selected.
+        const pickedItems = await vscode.window.showQuickPick(items, {
+          canPickMany: true,
+          placeHolder: "Select tabs to split into separate columns",
+        });
+
+        if (!pickedItems || pickedItems.length === 0) {
           vscode.window.showInformationMessage("No tabs selected.");
           return;
         }
 
-        // Filter to the matching Tab objects.
+        // Filter to the matching Tab objects based on the selected labels.
         const chosenTabs = allTabs.filter((tab) =>
-          pickedLabels.includes(tab.label)
+          pickedItems.some((item) => item.label === tab.label)
         );
         if (chosenTabs.length === 0) {
           vscode.window.showInformationMessage("No matching tabs found.");
@@ -135,23 +138,26 @@ export function activate(context: vscode.ExtensionContext) {
           return;
         }
 
-        // Show Quick Pick to select tabs.
-        const pickedLabels = await vscode.window.showQuickPick(
-          allTabs.map((tab) => tab.label),
-          {
-            canPickMany: true,
-            placeHolder: "Select tabs to add to a group",
-          }
-        );
+        // Create QuickPickItems with pre-selected state.
+        const items: vscode.QuickPickItem[] = allTabs.map((tab) => ({
+          label: tab.label,
+          picked: true,
+        }));
 
-        if (!pickedLabels || pickedLabels.length === 0) {
+        // Show Quick Pick with all items pre-selected.
+        const pickedItems = await vscode.window.showQuickPick(items, {
+          canPickMany: true,
+          placeHolder: "Select tabs to add to a group",
+        });
+
+        if (!pickedItems || pickedItems.length === 0) {
           vscode.window.showInformationMessage("No tabs selected.");
           return;
         }
 
         // Filter to the matching Tab objects.
         const chosenTabs = allTabs.filter((tab) =>
-          pickedLabels.includes(tab.label)
+          pickedItems.some((item) => item.label === tab.label)
         );
         if (chosenTabs.length === 0) {
           vscode.window.showInformationMessage("No matching tabs found.");
