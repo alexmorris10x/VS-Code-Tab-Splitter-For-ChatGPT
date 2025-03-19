@@ -29,6 +29,10 @@ export function activate(context: vscode.ExtensionContext) {
     "extension.splitSelectedTabs",
     async () => {
       try {
+        // Capture the active tab's URI to avoid reopening it.
+        const activeEditor = vscode.window.activeTextEditor;
+        const activeTabUri = activeEditor?.document.uri.toString();
+
         const allTabs = getAllLabeledTabs();
         if (allTabs.length === 0) {
           vscode.window.showInformationMessage("No labeled tabs found.");
@@ -59,12 +63,17 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         // Start splitting tabs into new columns.
-        let currentColumn =
-          vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
+        let currentColumn = activeEditor?.viewColumn || vscode.ViewColumn.One;
 
         for (const tab of chosenTabs) {
           if (tab.input instanceof vscode.TabInputText) {
             const docUri = tab.input.uri;
+
+            // Skip the active tab so it isn't opened twice.
+            if (docUri.toString() === activeTabUri) {
+              continue;
+            }
+
             const doc = await vscode.workspace.openTextDocument(docUri);
 
             // Check for unsaved changes.
