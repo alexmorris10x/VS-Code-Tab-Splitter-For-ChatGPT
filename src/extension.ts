@@ -7,6 +7,11 @@ interface SplitTabGroup {
 
 // Global variable to track the URIs of split tabs opened by the extension.
 let splitTabUris: string[] = [];
+/**
+ * Key used in workspaceState for persisting the original order of
+ * tabs that were in the main (active) group before a split.
+ */
+const INITIAL_ORDER_KEY = "initialTabOrder";
 
 /**
  * Type guard to determine if a tab's input is a text document input.
@@ -45,6 +50,18 @@ export function activate(context: vscode.ExtensionContext) {
         if (allTabs.length === 0) {
           vscode.window.showInformationMessage("No labeled tabs found.");
           return;
+        }
+        // Persist the current visual order of tabs in the active group so we can
+        // restore it when the user later runs `closeSplitTabs`.
+        const mainGroup = vscode.window.tabGroups.activeTabGroup;
+        if (mainGroup) {
+          const initialOrderUris = mainGroup.tabs
+            .filter((tab) => isTextTabInput(tab.input))
+            .map((tab) => (tab.input as vscode.TabInputText).uri.toString());
+          await context.workspaceState.update(
+            INITIAL_ORDER_KEY,
+            initialOrderUris
+          );
         }
 
         // Create QuickPickItems for all tabs with them pre-selected.
@@ -443,6 +460,27 @@ export function activate(context: vscode.ExtensionContext) {
           }
         });
 
+        // Sort the tabs we are about to move so that any tab that originally
+        // lived in the main column retains its relative position.
+        const initialOrder: string[] = context.workspaceState.get(
+          INITIAL_ORDER_KEY,
+          []
+        );
+        tabsToMove.sort((a, b) => {
+          if (!isTextTabInput(a.input) || !isTextTabInput(b.input)) {
+            return 0;
+          }
+          const aUri = a.input.uri.toString();
+          const bUri = b.input.uri.toString();
+          const aIdx = initialOrder.indexOf(aUri);
+          const bIdx = initialOrder.indexOf(bUri);
+
+          // Tabs not in the initial list are appended to the end.
+          if (aIdx === -1 && bIdx === -1) return 0;
+          if (aIdx === -1) return 1;
+          if (bIdx === -1) return -1;
+          return aIdx - bIdx;
+        });
         // Open each remaining tab in the primary column.
         for (const tab of tabsToMove) {
           if (isTextTabInput(tab.input)) {
@@ -458,6 +496,42 @@ export function activate(context: vscode.ExtensionContext) {
         await vscode.commands.executeCommand(
           "workbench.action.editorLayoutSingle"
         );
+
+        // ────────────────────────────────────────────────────────────────
+        // Re‑order the tabs in the primary group to match the exact order
+        // that existed before the split. We walk the desired order *in
+        // reverse*; each time we reveal a tab we immediately move it to the
+        // front. When done, the group’s visual order equals `initialOrder`.
+        // ────────────────────────────────────────────────────────────────
+        const primaryGroup = vscode.window.tabGroups.all.find(
+          (g) => g.viewColumn === mainColumn
+        );
+
+        if (primaryGroup && initialOrder.length > 0) {
+          for (let i = initialOrder.length - 1; i >= 0; i--) {
+            const targetUri = initialOrder[i];
+            const tab = primaryGroup.tabs.find(
+              (t) =>
+                isTextTabInput(t.input) && t.input.uri.toString() === targetUri
+            );
+            if (tab && isTextTabInput(tab.input)) {
+              // Reveal the tab so it becomes the active editor.
+              await vscode.window.showTextDocument(tab.input.uri, {
+                viewColumn: mainColumn,
+                preview: false,
+                preserveFocus: false,
+              });
+              // Move the now‑active editor to the first position.
+              await vscode.commands.executeCommand("moveActiveEditor", {
+                to: "first",
+              });
+            }
+          }
+        }
+
+        // The layout is now back to a single group and the ordering restored;
+        // we no longer need the saved list.
+        await context.workspaceState.update(INITIAL_ORDER_KEY, []);
       } catch (error) {
         vscode.window.showErrorMessage(`Error closing split tabs: ${error}`);
       }

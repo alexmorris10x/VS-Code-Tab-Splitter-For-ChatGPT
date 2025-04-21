@@ -1,4 +1,6 @@
 .
+├── images
+│   └── logo.png
 ├── out
 │   ├── extension.js
 │   └── extension.js.map
@@ -11,4 +13,4 @@
 │   └── extension.ts
 └── tsconfig.json
 
-3 directories, 9 files
+4 directories, 10 files

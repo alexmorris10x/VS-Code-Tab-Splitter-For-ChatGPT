@@ -10,6 +10,7 @@
   "engines": {
     "vscode": "^1.80.0"
   },
+  "icon": "images/logo.png",
   "categories": [
     "Other"
   ],
