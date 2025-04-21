@@ -4,7 +4,7 @@
 │   └── extension.js.map
 ├── package-lock.json
 ├── package.json
-├── set_github_secrets.sh
+├── README
 ├── split-selected-tabs-1.0.0.vsix
 ├── src
 │   ├── extension.js
